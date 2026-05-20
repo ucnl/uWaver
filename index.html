@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌊 uWaver</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌊 uWaver</h1>
+            <div class="header-controls">
+                <select id="langSelector" class="lang-select">
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
+                </select>
+                <span id="connectionStatus" class="status-badge disconnected" data-i18n="status_disconnected">Отключено</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Connection Panel -->
+            <section class="panel connection-panel">
+                <h2 data-i18n="connection_title">Подключение</h2>
+                <div class="auto-connect-status">
+                    <span class="connect-indicator disconnected"></span>
+                    <span id="connectStatusText" data-i18n="device_not_selected">Устройство не выбрано</span>
+                </div>
+                <div class="button-group" style="margin-top: 12px;">
+                    <button type="button" id="btnConnect" class="btn btn-primary" data-i18n="connect">Подключить</button>
+                    <button type="button" id="btnDisconnect" class="btn btn-secondary" data-i18n="disconnect" disabled>Отключить</button>
+                </div>
+            </section>
+
+            <!-- Device Info Panel -->
+            <section class="panel device-info-panel">
+                <h2 data-i18n="device_info_title">Информация об устройстве</h2>
+                <div class="connection-info" id="deviceInfoContainer">
+                    <div class="info-row"><span class="label" data-i18n="dev_system">Система:</span><span class="value" id="devSystem">-</span></div>
+                    <div class="info-row"><span class="label">Core:</span><span class="value" id="devCore">-</span></div>
+                    <div class="info-row"><span class="label">S/N:</span><span class="value" id="devSerial">-</span></div>
+                    <div class="info-row"><span class="label" data-i18n="dev_baudrate">Акустический baudrate:</span><span class="value" id="devBaudrate">-</span></div>
+                    <div class="info-row"><span class="label" data-i18n="dev_total_ch">Всего каналов:</span><span class="value" id="devTotalCh">-</span></div>
+                    <div class="info-row"><span class="label">PTS:</span><span class="value" id="devPTS">-</span></div>
+                </div>
+                <div class="button-group" style="margin-top: 12px;">
+                    <button type="button" id="btnQueryDeviceInfo" class="btn btn-secondary" data-i18n="query_device_info" disabled>Запросить информацию</button>
+                </div>
+            </section>
+
+            <!-- Tabs -->
+            <div class="tabs" id="mainTabs">
+                <button class="tab active" data-tab="deviceSettings" data-i18n="tab_settings">Настройки</button>
+                <button class="tab" data-tab="remoteRequests" data-i18n="tab_remote">Удалённые запросы</button>
+                <button class="tab" data-tab="packetMode" data-i18n="tab_packet">Пакетный режим</button>
+                <button class="tab" data-tab="localSensors" data-i18n="tab_sensors">Локальные сенсоры</button>
+                <button class="tab" data-tab="aqpng">AQ-PNG</button>
+            </div>
+
+            <!-- Tab: Device Settings -->
+            <section class="panel tab-panel active" id="panelDeviceSettings">
+                <h2 data-i18n="dev_settings_title">Основные настройки</h2>
+                <form id="deviceSettingsForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="devTxChID" data-i18n="tx_channel">TX канал:</label>
+                            <select id="devTxChID" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="devRxChID" data-i18n="rx_channel">RX канал:</label>
+                            <select id="devRxChID" class="form-control"></select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="devSalinityPSU" data-i18n="salinity">Солёность (PSU):</label>
+                            <input type="number" id="devSalinityPSU" class="form-control" min="0" max="42" step="0.1" value="0">
+                            <span class="validation-hint">0 – 42 PSU</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="devGravityAcc" data-i18n="gravity">Гравитация (м/с²):</label>
+                            <input type="number" id="devGravityAcc" class="form-control" min="9.7" max="9.9" step="0.001" value="9.8">
+                            <span class="validation-hint">9.7 – 9.9 м/с²</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="devCmdModeDefault" checked>
+                            <span data-i18n="cmd_mode_default">Command Mode по умолчанию</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="devACKOnTxFinished">
+                            <span data-i18n="ack_on_tx">ACK по завершению передачи</span>
+                        </label>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" id="btnDefaultSettings" class="btn btn-secondary" data-i18n="btn_defaults">По умолчанию</button>
+                        <button type="button" id="btnApplySettings" class="btn btn-primary" data-i18n="btn_apply" disabled>Применить настройки</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Tab: Remote Requests -->
+            <section class="panel tab-panel hidden" id="panelRemoteRequests">
+                <h2 data-i18n="rc_title">Удалённые запросы (Remote Control)</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="rcTxChID" data-i18n="tx_channel">TX канал:</label>
+                        <select id="rcTxChID" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rcRxChID" data-i18n="rx_channel">RX канал:</label>
+                        <select id="rcRxChID" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rcCmdID" data-i18n="command">Команда:</label>
+                        <select id="rcCmdID" class="form-control">
+                            <option value="0">RC_PING</option>
+                            <option value="2" selected>RC_DPT_GET</option>
+                            <option value="3">RC_TMP_GET</option>
+                            <option value="4">RC_BAT_V_GET</option>
+                            <option value="7">RC_USR_CMD_000</option>
+                            <option value="8">RC_USR_CMD_001</option>
+                            <option value="9">RC_USR_CMD_002</option>
+                            <option value="10">RC_USR_CMD_003</option>
+                            <option value="11">RC_USR_CMD_004</option>
+                            <option value="12">RC_USR_CMD_005</option>
+                            <option value="13">RC_USR_CMD_006</option>
+                            <option value="14">RC_USR_CMD_007</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" id="btnRCSend" class="btn btn-primary" data-i18n="btn_send_request" disabled>Отправить запрос</button>
+                </div>
+
+                <!-- Auto mode -->
+                <div class="auto-mode-section">
+                    <h3 data-i18n="auto_mode">Авто-режим</h3>
+                    <div class="auto-mode-buttons">
+                        <button type="button" class="btn btn-auto" data-count="0" id="btnAutoFull">FULL AUTO</button>
+                        <button type="button" class="btn btn-auto" data-count="256" id="btnAuto256">256</button>
+                        <button type="button" class="btn btn-auto" data-count="128" id="btnAuto128">128</button>
+                    </div>
+                    <div class="auto-mode-status" id="autoModeStatus">
+                        <span data-i18n="auto_mode_off">Авто-режим: ВЫКЛ</span>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="stats-section">
+                    <h3 data-i18n="statistics">Статистика</h3>
+                    <div class="stats-container" id="rcStatsContainer">
+                        <pre id="rcStatsText" data-i18n="no_data">Нет данных</pre>
+                    </div>
+                    <button type="button" id="btnClearStats" class="btn btn-small btn-secondary" data-i18n="btn_clear">Очистить</button>
+                </div>
+
+                <!-- RC Log -->
+                <div class="log-section">
+                    <div class="log-header">
+                        <h3 data-i18n="rc_log">Лог запросов</h3>
+                        <div>
+                            <button type="button" id="btnRCCopy" class="btn btn-small btn-secondary" data-i18n="btn_copy" disabled>Копировать</button>
+                            <button type="button" id="btnRCClear" class="btn btn-small btn-secondary" data-i18n="btn_clear" disabled>Очистить</button>
+                            <label class="checkbox-label" style="display:inline-flex; margin-left:8px;">
+                                <input type="checkbox" id="rcAutoscroll" checked>
+                                <span data-i18n="autoscroll">Автопрокрутка</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="log-container" id="rcLogContainer"></div>
+                </div>
+            </section>
+
+            <!-- Tab: Packet Mode -->
+            <section class="panel tab-panel hidden" id="panelPacketMode">
+                <h2 data-i18n="pt_title">Пакетный режим (Packet Mode)</h2>
+                
+                <div class="subsection">
+                    <h3 data-i18n="pt_settings">Настройки</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ptLocalAddr" data-i18n="local_address">Локальный адрес:</label>
+                            <select id="ptLocalAddr" class="form-control"></select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="ptSaveToFlash">
+                            <span data-i18n="save_to_flash">Сохранить во flash</span>
+                        </label>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" id="btnPTQuerySettings" class="btn btn-secondary" data-i18n="btn_query_settings" disabled>Запросить настройки</button>
+                        <button type="button" id="btnPTApplySettings" class="btn btn-primary" data-i18n="btn_apply" disabled>Применить</button>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="subsection">
+                    <h3 data-i18n="pt_telemetry">Запрос телеметрии (PT-ITG)</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ptReqTargetAddr" data-i18n="target_address">Целевой адрес:</label>
+                            <select id="ptReqTargetAddr" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ptReqDataID" data-i18n="data_type">Тип данных:</label>
+                            <select id="ptReqDataID" class="form-control">
+                                <option value="0" data-i18n="did_dpt">DID_DPT (глубина)</option>
+                                <option value="1" data-i18n="did_tmp">DID_TMP (температура)</option>
+                                <option value="2" data-i18n="did_bat">DID_BAT (напряжение)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" id="btnPTReqSend" class="btn btn-primary" data-i18n="btn_send_request" disabled>Отправить запрос</button>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="subsection">
+                    <h3 data-i18n="pt_send_packet">Передача пакета</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ptPacketTargetAddr" data-i18n="target_address">Целевой адрес:</label>
+                            <select id="ptPacketTargetAddr" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ptPacketTries" data-i18n="tries">Попыток:</label>
+                            <select id="ptPacketTries" class="form-control">
+                                <option value="0">0</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="4">4</option>
+                                <option value="8" selected>8</option>
+                                <option value="16">16</option>
+                                <option value="32">32</option>
+                                <option value="64">64</option>
+                                <option value="128">128</option>
+                                <option value="255">255</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ptPacketData" data-i18n="packet_data">Данные (ASCII, макс. 64 байта):</label>
+                        <input type="text" id="ptPacketData" class="form-control" maxlength="64" placeholder="Введите текст пакета...">
+                        <span class="validation-hint" id="ptPacketSizeHint">0 / 64 байт</span>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" id="btnPTPacketSend" class="btn btn-primary" data-i18n="btn_send_packet" disabled>Отправить пакет</button>
+                        <button type="button" id="btnPTPacketAbort" class="btn btn-secondary" data-i18n="btn_abort" disabled>Прервать отправку</button>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="log-section">
+                    <div class="log-header">
+                        <h3 data-i18n="pt_log">Лог пакетного режима</h3>
+                        <div>
+                            <button type="button" id="btnPTCopy" class="btn btn-small btn-secondary" data-i18n="btn_copy" disabled>Копировать</button>
+                            <button type="button" id="btnPTClear" class="btn btn-small btn-secondary" data-i18n="btn_clear" disabled>Очистить</button>
+                        </div>
+                    </div>
+                    <div class="log-container" id="ptLogContainer"></div>
+                </div>
+            </section>
+
+            <!-- Tab: Local Sensors -->
+            <section class="panel tab-panel hidden" id="panelLocalSensors">
+                <h2 data-i18n="sensors_title">Локальные сенсоры</h2>
+                
+                <div class="subsection">
+                    <h3 data-i18n="sensors_current">Текущие показания</h3>
+                    <div class="sensors-monitor" id="sensorsMonitor">
+                        <div class="sensor-row"><span class="label" data-i18n="pressure">Давление:</span><span class="value" id="sensorPressure">-</span></div>
+                        <div class="sensor-row"><span class="label" data-i18n="temperature">Температура:</span><span class="value" id="sensorTemperature">-</span></div>
+                        <div class="sensor-row"><span class="label" data-i18n="depth">Глубина:</span><span class="value" id="sensorDepth">-</span></div>
+                        <div class="sensor-row"><span class="label" data-i18n="voltage">Напряжение:</span><span class="value" id="sensorVoltage">-</span></div>
+                        <div class="sensor-row"><span class="label">Pitch:</span><span class="value" id="sensorPitch">-</span></div>
+                        <div class="sensor-row"><span class="label">Roll:</span><span class="value" id="sensorRoll">-</span></div>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="subsection">
+                    <h3 data-i18n="sensors_cfg1">Настройка опроса (давление, температура, глубина, напр.)</h3>
+                    <div class="form-group">
+                        <label data-i18n="sensors">Датчики:</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label"><input type="checkbox" id="lsIsPressure" checked><span data-i18n="pressure">Давление</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="lsIsTemperature" checked><span data-i18n="temperature">Температура</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="lsIsDepth" checked><span data-i18n="depth">Глубина</span></label>
+                            <label class="checkbox-label"><input type="checkbox" id="lsIsVoltage" checked><span data-i18n="voltage">Напряжение</span></label>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ls1Period" data-i18n="poll_period">Период опроса:</label>
+                            <select id="ls1Period" class="form-control">
+                                <option value="NEVER" data-i18n="never">NEVER</option>
+                                <option value="TANDEM">TANDEM</option>
+                                <option value="1000" selected>1 сек</option>
+                                <option value="2000">2 сек</option>
+                                <option value="4000">4 сек</option>
+                                <option value="5000">5 сек</option>
+                                <option value="6000">6 сек</option>
+                                <option value="7000">7 сек</option>
+                                <option value="8000">8 сек</option>
+                                <option value="9000">9 сек</option>
+                                <option value="10000">10 сек</option>
+                                <option value="30000">30 сек</option>
+                                <option value="60000">1 мин</option>
+                                <option value="300000">5 мин</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="ls1SaveToFlash">
+                            <span data-i18n="save_to_flash">Сохранить во flash</span>
+                        </label>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" id="btnLS1Apply" class="btn btn-primary" data-i18n="btn_apply" disabled>Применить</button>
+                    </div>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="subsection">
+                    <h3 data-i18n="sensors_cfg2">Настройка опроса (pitch, roll)</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ls2Period" data-i18n="poll_period">Период опроса:</label>
+                            <select id="ls2Period" class="form-control">
+                                <option value="NEVER" data-i18n="never">NEVER</option>
+                                <option value="TANDEM">TANDEM</option>
+                                <option value="1000" selected>1 сек</option>
+                                <option value="2000">2 сек</option>
+                                <option value="4000">4 сек</option>
+                                <option value="5000">5 сек</option>
+                                <option value="6000">6 сек</option>
+                                <option value="7000">7 сек</option>
+                                <option value="8000">8 сек</option>
+                                <option value="9000">9 сек</option>
+                                <option value="10000">10 сек</option>
+                                <option value="30000">30 сек</option>
+                                <option value="60000">1 мин</option>
+                                <option value="300000">5 мин</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="ls2SaveToFlash">
+                            <span data-i18n="save_to_flash">Сохранить во flash</span>
+                        </label>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" id="btnLS2Apply" class="btn btn-primary" data-i18n="btn_apply" disabled>Применить</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab: AQ-PNG -->
+            <section class="panel tab-panel hidden" id="panelAqpng">
+                <h2>AQ-PNG (Auto-Query / Pinger)</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="aqpngMode" data-i18n="mode">Режим:</label>
+                        <select id="aqpngMode" class="form-control">
+                            <option value="0">AQPNG_DISABLED</option>
+                            <option value="1">AQPNG_PINGER</option>
+                            <option value="2">AQPNG_MASTER</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="aqpngPeriodMs" data-i18n="period_ms">Период (мс):</label>
+                        <input type="number" id="aqpngPeriodMs" class="form-control" min="0" max="300000" step="100" value="2000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="aqpngDataID" data-i18n="data_type">Тип данных:</label>
+                        <select id="aqpngDataID" class="form-control">
+                            <option value="0">DEPTH</option>
+                            <option value="1">TEMPERATURE</option>
+                            <option value="2">SUPPLY VOLTAGE</option>
+                            <option value="3" selected>ALL IN CYCLE</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="aqpngRCTxID" data-i18n="rc_tx_channel">RC TX канал:</label>
+                        <select id="aqpngRCTxID" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="aqpngRCRxID" data-i18n="rc_rx_channel">RC RX канал:</label>
+                        <select id="aqpngRCRxID" class="form-control"></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="aqpngIsPTMode">
+                        <span data-i18n="pt_mode">Пакетный режим (PT)</span>
+                    </label>
+                </div>
+                <div class="form-group" id="aqpngPTAddrGroup" style="display:none;">
+                    <label for="aqpngPTTargetAddr" data-i18n="pt_target_address">PT Target адрес:</label>
+                    <input type="number" id="aqpngPTTargetAddr" class="form-control" min="0" max="255" value="0">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="aqpngSaveToFlash">
+                        <span data-i18n="save_to_flash">Сохранить во flash</span>
+                    </label>
+                </div>
+                <div class="button-group">
+                    <button type="button" id="btnAqpngQuery" class="btn btn-secondary" data-i18n="btn_query_settings" disabled>Запросить настройки</button>
+                    <button type="button" id="btnAqpngDefaults" class="btn btn-secondary" data-i18n="btn_defaults">По умолчанию</button>
+                    <button type="button" id="btnAqpngApply" class="btn btn-primary" data-i18n="btn_apply" disabled>Применить</button>
+                </div>
+            </section>
+
+            <!-- Log Panel -->
+            <section class="panel log-panel">
+                <div class="log-header" id="logHeader">
+                    <h2 data-i18n="log_title">Лог обмена</h2>
+                    <span class="log-toggle-icon" id="logToggleIcon"> ▶</span>
+                </div>
+                <div id="logContainer" class="log-container" style="display:none;">
+                    <div class="log-entry info" data-i18n="log_ready">Готов к работе...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="https://github.com/ucnl/uWaver/" target="_blank" rel="noopener" class="footer-link">⭐ GitHub</a>
+                    <a href="https://docs.unavlab.com/" target="_blank" rel="noopener" class="footer-link">📖 Docs</a>
+                    <a href="https://github.com/ucnl/uWaver/blob/main/LICENSE" target="_blank" rel="noopener" class="footer-link">⚖️ GNU GPL v3.0 License</a>
+                </div>
+                <div class="footer-info">
+                    <span class="footer-copy">© 2026 <span data-i18n="org_name">(C) UC&NL</span></span>
+                    <span class="footer-desc" data-i18n="footer_desc">Open Source Configuration Tool</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="uWavePort.js"></script>
+    <script src="i18n.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
