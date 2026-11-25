@@ -272,16 +272,17 @@ class uWavePort extends EventTarget {
        }
     }
 
-    async close() {
-        this._stopTimer();
-        await this.serial.close();
-        this.detected = false;
-        this.isDeviceInfoValid = false;
-        this.connecting = false;
-        this.isWaitingLocal = false;
-        this.isWaitingRemote = false;
-        this._emit('stateChanged');
-    }
+	async close() {
+		this._stopTimer();
+		this.detected = false;
+		this.isDeviceInfoValid = false;
+		this.connecting = false;
+		this.isWaitingLocal = false;
+		this.isWaitingRemote = false;
+		this._emit('stateChanged');
+		try { await this.serial.close(); }
+		catch (e) { console.warn('[uWavePort] close error:', e.message); }
+	}
 
     _onClose() {
         this._emit('log', { message: 'Port closed' });
@@ -441,19 +442,83 @@ class uWavePort extends EventTarget {
         this._emit('deviceInfoValidChanged'); this._emit('stateChanged');
     }
 
-    _parsePT_SETTINGS(params) { this.ptAddress = o2i(params[1]); this._stopTimer(); this.isWaitingLocal = false; this._emit('packetModeSettingsReceived', { isPTMode: o2i(params[0]) !== 0, ptAddress: this.ptAddress }); }
-    _parsePT_FAILED(params) { this._emit('packetTransferFailed', { targetPtAddress: o2i(params[0]), triesTaken: o2i(params[1]), azimuth: NaN, dataPacket: Array.isArray(params[2]) ? new Uint8Array(params[2]) : params[2] }); }
-    _parsePT_DLVRD(params) { this._emit('packetTransferred', { targetPtAddress: o2i(params[0]), triesTaken: o2i(params[1]), azimuth: o2d(params[2]), dataPacket: Array.isArray(params[3]) ? new Uint8Array(params[3]) : params[3] }); }
-    _parsePT_RCVD(params) { this._emit('packetReceived', { targetPtAddress: o2i(params[0]), azimuth: o2d(params[1]), dataPacket: Array.isArray(params[2]) ? new Uint8Array(params[2]) : params[2] }); }
-    _parsePT_ITG_TMO(params) { this._stopTimer(); this.isWaitingRemote = false; this._emit('packetRequestTimeout', { targetPtAddress: o2i(params[0]), dataId: o2did(params[1]) }); this._emit('stateChanged'); }
-    _parsePT_ITG_RESP(params) { this._stopTimer(); this.isWaitingRemote = false; this._emit('packetResponse', { targetPtAddress: o2i(params[0]), dataId: o2did(params[1]), dataValue: o2d(params[2]), propagationTimeS: o2d(params[3]), azimuth: o2d(params[4]) }); this._emit('stateChanged'); }
-    _parseAQPNG(params) { this._stopTimer(); this.isWaitingLocal = false; this._emit('aqpngSettingsReceived', { mode: o2am(params[1]), periodMs: o2i(params[2]), dataId: o2i(params[3]), txID: o2i(params[4]), rxID: o2i(params[5]), isPT: o2i(params[6]) !== 0, ptTargetAddr: o2i(params[7]) }); }
+    _parsePT_SETTINGS(params) { 
+		this.ptAddress = o2i(params[1]); 
+		this._stopTimer(); 
+		this.isWaitingLocal = false; 
+		this._emit('packetModeSettingsReceived', { isPTMode: o2i(params[0]) !== 0, ptAddress: this.ptAddress }); 
+	}
+	
+    _parsePT_FAILED(params) {
+		this._emit('packetTransferFailed', { targetPtAddress: o2i(params[0]), triesTaken: o2i(params[1]), azimuth: NaN, dataPacket: Array.isArray(params[2]) ? new Uint8Array(params[2]) : params[2] }); 
+	}
+	
+    _parsePT_DLVRD(params) { 
+		this._emit('packetTransferred', { targetPtAddress: o2i(params[0]), triesTaken: o2i(params[1]), azimuth: o2d(params[2]), dataPacket: Array.isArray(params[3]) ? new Uint8Array(params[3]) : params[3] }); 
+	}
+	
+    _parsePT_RCVD(params) { 
+		this._emit('packetReceived', { targetPtAddress: o2i(params[0]), azimuth: o2d(params[1]), dataPacket: Array.isArray(params[2]) ? new Uint8Array(params[2]) : params[2] }); 
+	}
+	
+    _parsePT_ITG_TMO(params) {
+		this._stopTimer(); this.isWaitingRemote = false; this._emit('packetRequestTimeout', { targetPtAddress: o2i(params[0]), dataId: o2did(params[1]) }); 
+		this._emit('stateChanged'); 
+	}
+	
+    _parsePT_ITG_RESP(params) { 
+		this._stopTimer(); 
+		this.isWaitingRemote = false; 
+		this._emit('packetResponse', { targetPtAddress: o2i(params[0]), dataId: o2did(params[1]), dataValue: o2d(params[2]), propagationTimeS: o2d(params[3]), azimuth: o2d(params[4]) }); this._emit('stateChanged'); 
+	}
+	
+    _parseAQPNG(params) {
+		this._stopTimer(); 
+		this.isWaitingLocal = false; 
+		this._emit('aqpngSettingsReceived', { mode: o2am(params[1]), periodMs: o2i(params[2]), dataId: o2i(params[3]), txID: o2i(params[4]), rxID: o2i(params[5]), isPT: o2i(params[6]) !== 0, ptTargetAddr: o2i(params[7]) }); 
+	}
 
     // ======================== Timer ========================
-    _startTimer(timeoutMs) { this._stopTimer(); this.timerCnt = 0; this.timerCntMax = Math.max(1, Math.ceil(timeoutMs / this.timerPeriodMs)); this.timeoutTimer = setInterval(() => this._timerTick(), this.timerPeriodMs); }
-    _stopTimer() { if (this.timeoutTimer) { clearInterval(this.timeoutTimer); this.timeoutTimer = null; } this.timerCnt = 0; }
+    _startTimer(timeoutMs) {
+		this._stopTimer(); 
+		this.timerCnt = 0; 
+		this.timerCntMax = Math.max(1, Math.ceil(timeoutMs / this.timerPeriodMs)); 
+		this.timeoutTimer = setInterval(() => this._timerTick(), this.timerPeriodMs); 
+	}
+	
+    _stopTimer() {
+		if (this.timeoutTimer) {
+			clearInterval(this.timeoutTimer); 
+			this.timeoutTimer = null; 
+		} 
+		this.timerCnt = 0; 
+	}
+	
     _resetTimer() { this.timerCnt = 0; }
-    _timerTick() { this.timerCnt++; if (this.timerCnt >= this.timerCntMax) { this._stopTimer(); if (this.detected) { this._emit('portTimeout'); this.detected = false; this.isWaitingLocal = false; this.isWaitingRemote = false; this._emit('stateChanged'); } } }
+	
+_timerTick() {
+    this.timerCnt++;
+    if (this.timerCnt >= this.timerCntMax) {
+        this._stopTimer();
+        const wasWaitingLocal = this.isWaitingLocal;
+        const wasWaitingRemote = this.isWaitingRemote;
+
+        this.isWaitingLocal = false;
+        this.isWaitingRemote = false;
+
+        if (this.detected) {
+            this._emit('log', { message: `Timeout waiting response (lastQueryID=${this.lastQueryID})` });
+            // ★ detected НЕ сбрасываем — устройство живое, просто не ответило на конкретную команду
+        } else {
+            this.connecting = false;
+            this._emit('error', { message: 'Timeout waiting for device response' });
+        }
+
+        if (wasWaitingLocal || wasWaitingRemote) {
+            this._emit('stateChanged');
+        }
+    }
+}
 
     _icsByMsgID(msgID) {
         const map = { '0': ICs.IC_D2H_ACK, '1': ICs.IC_H2D_SETTINGS_WRITE, '2': ICs.IC_H2D_RC_REQUEST, '3': ICs.IC_D2H_RC_RESPONSE, '4': ICs.IC_D2H_RC_TIMEOUT, '5': ICs.IC_D2H_RC_ASYNC_IN, '6': ICs.IC_H2D_AMB_DTA_CFG, '7': ICs.IC_D2H_AMB_DTA, '8': ICs.IC_H2D_INC_DTA_CFG, '9': ICs.IC_D2H_INC_DTA, '?': ICs.IC_H2D_DINFO_GET, '!': ICs.IC_D2H_DINFO, 'D': ICs.IC_H2D_PT_SETTINGS_READ, 'E': ICs.IC_D2H_PT_SETTINGS, 'F': ICs.IC_H2H_PT_SETTINGS_WRITE, 'G': ICs.IC_H2D_PT_SEND, 'H': ICs.IC_D2H_PT_FAILED, 'I': ICs.IC_D2H_PT_DLVRD, 'J': ICs.IC_D2H_PT_RCVD, 'K': ICs.IC_H2D_PT_ITG, 'L': ICs.IC_D2H_PT_ITG_TMO, 'M': ICs.IC_D2H_PT_ITG_RESP, 'N': ICs.IC_H2D_AQPNG_SETTINGS_READ, 'O': ICs.IC_HDH_AQPNG_SETTINGS };
